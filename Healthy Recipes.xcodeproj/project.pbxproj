@@ -7,12 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		12CD0F3B2DA37BEF00DE15DC /* recipes.json in Resources */ = {isa = PBXBuildFile; fileRef = 12CD0F3A2DA37BEF00DE15DC /* recipes.json */; };
+		12CD0F722DA4D1E100DE15DC /* .gitignore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CD0F702DA4D1D600DE15DC /* .gitignore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		12CD0F252DA2FAD100DE15DC /* Healthy Recipes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "Healthy Recipes.app"; path = "/Users/guzalrustemova/Desktop/Healthy Recipes/build/Debug-iphoneos/Healthy Recipes.app"; sourceTree = "<absolute>"; };
-		12CD0F3A2DA37BEF00DE15DC /* recipes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = recipes.json; sourceTree = "<group>"; };
+		12CD0F702DA4D1D600DE15DC /* .gitignore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = .gitignore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -42,9 +42,9 @@
 		12CD0F1C2DA2FAD100DE15DC = {
 			isa = PBXGroup;
 			children = (
+				12CD0F702DA4D1D600DE15DC /* .gitignore.swift */,
 				12CD0F272DA2FAD100DE15DC /* Healthy Recipes */,
 				12CD0F392DA2FB4700DE15DC /* Views */,
-				12CD0F3A2DA37BEF00DE15DC /* recipes.json */,
 			);
 			sourceTree = "<group>";
 		};
@@ -113,7 +113,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				12CD0F3B2DA37BEF00DE15DC /* recipes.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +123,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				12CD0F722DA4D1E100DE15DC /* .gitignore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
