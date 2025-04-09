@@ -1,4 +1,60 @@
 import SwiftUI
+import Security
+
+// Вспомогательный класс для работы с Keychain
+class KeychainHelper {
+    static let shared = KeychainHelper()
+    
+    private init() {}
+    
+    // Сохранение данных в Keychain
+    func save(_ value: String, forKey key: String) -> Bool {
+        if let data = value.data(using: .utf8) {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrAccount as String: key,
+                kSecValueData as String: data
+            ]
+            
+            // Удаляем старые данные, если они есть
+            SecItemDelete(query as CFDictionary)
+            
+            // Сохраняем новые данные
+            let status = SecItemAdd(query as CFDictionary, nil)
+            return status == errSecSuccess
+        }
+        return false
+    }
+    
+    // Чтение данных из Keychain
+    func read(_ key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        
+        if status == errSecSuccess, let data = item as? Data, let value = String(data: data, encoding: .utf8) {
+            return value
+        }
+        return nil
+    }
+    
+    // Удаление данных из Keychain
+    func delete(_ key: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key
+        ]
+        
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess
+    }
+}
 
 struct WelcomeView: View {
     @State private var username: String = ""
@@ -9,21 +65,58 @@ struct WelcomeView: View {
     @State private var showingAlert: Bool = false
     @State private var alertMessage: String = ""
     @State private var navigateToMain: Bool = false
+    @State private var showForgotPasswordModal: Bool = false // Для модального окна "Забыли пароль?"
+    @State private var forgotPasswordEmail: String = "" // Для сброса пароля
+    @State private var isContentVisible: Bool = false // Для анимации
+    
+    // Валидация email
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
+        return emailPred.evaluate(with: email)
+    }
+    
+    // Проверка уникальности email
+    private func isEmailUnique(_ email: String) -> Bool {
+        let existingEmails = UserDefaults.standard.stringArray(forKey: "registeredEmails") ?? []
+        return !existingEmails.contains(email)
+    }
+    
+    // Сохранение email в список
+    private func saveEmail(_ email: String) {
+        var existingEmails = UserDefaults.standard.stringArray(forKey: "registeredEmails") ?? []
+        existingEmails.append(email)
+        UserDefaults.standard.set(existingEmails, forKey: "registeredEmails")
+    }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Image("background_illustrations")
+                // Фоновое изображение из Assets.xcassets с увеличенной яркостью
+                Image("Image 2")
                     .resizable()
                     .scaledToFill()
-                    .ignoresSafeArea()
+                    .edgesIgnoringSafeArea(.all)
                 
+                // Полупрозрачный слой для улучшения читаемости
+                Color.black.opacity(0.4)
+                    .edgesIgnoringSafeArea(.all)
+                
+                // Используем VStack вместо ScrollView для точного центрирования
                 VStack(spacing: 20) {
+                    Spacer() // Spacer сверху для центрирования
+                    
+                    // Заголовок с анимацией, тенью и белым цветом
                     Text("Легкие и простые рецепты на каждый день")
                         .font(.custom("AvenirNext-Bold", size: 24))
-                        .foregroundColor(.black)
+                        .foregroundColor(.white) // Белый цвет для контраста
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
+                        .padding(.top, 40)
+                        .opacity(isContentVisible ? 1 : 0)
+                        .offset(y: isContentVisible ? 0 : 20)
+                        .animation(.easeInOut(duration: 0.5), value: isContentVisible)
+                        .shadow(color: .black.opacity(0.5), radius: 3, x: 2, y: 2) // Добавляем тень
                     
                     // Переключатель режимов
                     Picker("Режим", selection: $isRegisterMode) {
@@ -32,6 +125,9 @@ struct WelcomeView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal, 50)
+                    .opacity(isContentVisible ? 1 : 0)
+                    .offset(y: isContentVisible ? 0 : 20)
+                    .animation(.easeInOut(duration: 0.5).delay(0.2), value: isContentVisible)
                     
                     // Поля для регистрации (показываются только в режиме регистрации)
                     if isRegisterMode {
@@ -39,10 +135,11 @@ struct WelcomeView: View {
                         ZStack(alignment: .leading) {
                             TextField("Имя", text: $name)
                                 .font(.custom("AvenirNext-Regular", size: 18))
-                                .padding(10)
-                                .padding(.leading, 40) // Отступ слева для иконки
-                                .background(Color.white.opacity(0.9))
-                                .cornerRadius(5)
+                                .padding(12)
+                                .padding(.leading, 40)
+                                .background(Color(.systemBackground).opacity(0.9))
+                                .cornerRadius(10)
+                                .shadow(radius: 2)
                                 .keyboardType(.asciiCapable)
                                 .autocapitalization(.none)
                                 .autocorrectionDisabled()
@@ -52,15 +149,19 @@ struct WelcomeView: View {
                                 .padding(.leading, 15)
                         }
                         .padding(.horizontal, 50)
+                        .opacity(isContentVisible ? 1 : 0)
+                        .offset(y: isContentVisible ? 0 : 20)
+                        .animation(.easeInOut(duration: 0.5).delay(0.3), value: isContentVisible)
                         
                         // Поле для почты
                         ZStack(alignment: .leading) {
                             TextField("Почта", text: $email)
                                 .font(.custom("AvenirNext-Regular", size: 18))
-                                .padding(10)
-                                .padding(.leading, 40) // Отступ слева для иконки
-                                .background(Color.white.opacity(0.9))
-                                .cornerRadius(5)
+                                .padding(12)
+                                .padding(.leading, 40)
+                                .background(Color(.systemBackground).opacity(0.9))
+                                .cornerRadius(10)
+                                .shadow(radius: 2)
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
                                 .autocorrectionDisabled()
@@ -70,16 +171,20 @@ struct WelcomeView: View {
                                 .padding(.leading, 15)
                         }
                         .padding(.horizontal, 50)
+                        .opacity(isContentVisible ? 1 : 0)
+                        .offset(y: isContentVisible ? 0 : 20)
+                        .animation(.easeInOut(duration: 0.5).delay(0.4), value: isContentVisible)
                     }
                     
                     // Поле для имени пользователя (для входа или регистрации)
                     ZStack(alignment: .leading) {
-                        TextField("User", text: $username)
+                        TextField("Имя пользователя", text: $username)
                             .font(.custom("AvenirNext-Regular", size: 18))
-                            .padding(10)
-                            .padding(.leading, 40) // Отступ слева для иконки
-                            .background(Color.white.opacity(0.9))
-                            .cornerRadius(5)
+                            .padding(12)
+                            .padding(.leading, 40)
+                            .background(Color(.systemBackground).opacity(0.9))
+                            .cornerRadius(10)
+                            .shadow(radius: 2)
                             .keyboardType(.asciiCapable)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
@@ -89,15 +194,19 @@ struct WelcomeView: View {
                             .padding(.leading, 15)
                     }
                     .padding(.horizontal, 50)
+                    .opacity(isContentVisible ? 1 : 0)
+                    .offset(y: isContentVisible ? 0 : 20)
+                    .animation(.easeInOut(duration: 0.5).delay(isRegisterMode ? 0.5 : 0.3), value: isContentVisible)
                     
                     // Поле для пароля (для входа или регистрации)
                     ZStack(alignment: .leading) {
-                        SecureField("Password", text: $password)
+                        SecureField("Пароль", text: $password)
                             .font(.custom("AvenirNext-Regular", size: 18))
-                            .padding(10)
-                            .padding(.leading, 40) // Отступ слева для иконки
-                            .background(Color.white.opacity(0.9))
-                            .cornerRadius(5)
+                            .padding(12)
+                            .padding(.leading, 40)
+                            .background(Color(.systemBackground).opacity(0.9))
+                            .cornerRadius(10)
+                            .shadow(radius: 2)
                             .keyboardType(.asciiCapable)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
@@ -107,6 +216,23 @@ struct WelcomeView: View {
                             .padding(.leading, 15)
                     }
                     .padding(.horizontal, 50)
+                    .opacity(isContentVisible ? 1 : 0)
+                    .offset(y: isContentVisible ? 0 : 20)
+                    .animation(.easeInOut(duration: 0.5).delay(isRegisterMode ? 0.6 : 0.4), value: isContentVisible)
+                    
+                    // Кнопка "Забыли пароль?" (только в режиме входа)
+                    if !isRegisterMode {
+                        Button(action: {
+                            showForgotPasswordModal = true
+                        }) {
+                            Text("Забыли пароль?")
+                                .font(.custom("AvenirNext-Regular", size: 18))
+                                .foregroundColor(.black)
+                        }
+                        .opacity(isContentVisible ? 1 : 0)
+                        .offset(y: isContentVisible ? 0 : 20)
+                        .animation(.easeInOut(duration: 0.5).delay(0.5), value: isContentVisible)
+                    }
                     
                     // Кнопка действия (меняется в зависимости от режима)
                     Button(action: {
@@ -115,19 +241,33 @@ struct WelcomeView: View {
                             if name.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty {
                                 alertMessage = "Пожалуйста, заполните все поля"
                                 showingAlert = true
+                            } else if !isValidEmail(email) {
+                                alertMessage = "Некорректный формат email"
+                                showingAlert = true
+                            } else if !isEmailUnique(email) {
+                                alertMessage = "Этот email уже зарегистрирован"
+                                showingAlert = true
                             } else {
                                 UserDefaults.standard.set(username, forKey: "username")
-                                alertMessage = "Аккаунт создан! Теперь войдите."
-                                showingAlert = true
-                                isRegisterMode = false // Переключаем обратно в режим входа
-                                name = ""
-                                email = ""
-                                username = ""
-                                password = ""
+                                // Сохраняем пароль в Keychain вместо UserDefaults
+                                if KeychainHelper.shared.save(password, forKey: "password") {
+                                    saveEmail(email) // Сохраняем email в список
+                                    alertMessage = "Аккаунт создан! Теперь войдите."
+                                    showingAlert = true
+                                    isRegisterMode = false
+                                    name = ""
+                                    email = ""
+                                    username = ""
+                                    password = ""
+                                } else {
+                                    alertMessage = "Ошибка при сохранении пароля"
+                                    showingAlert = true
+                                }
                             }
                         } else {
                             // Режим входа
-                            if username == "user" && password == "123" {
+                            let savedPassword = KeychainHelper.shared.read("password") ?? "123"
+                            if username == "user" && password == savedPassword {
                                 UserDefaults.standard.set(username, forKey: "username")
                                 navigateToMain = true
                             } else {
@@ -143,14 +283,112 @@ struct WelcomeView: View {
                             .frame(width: 250)
                             .background(Color.black.opacity(0.8))
                             .cornerRadius(10)
+                            .shadow(radius: 3)
                     }
+                    .opacity(isContentVisible ? 1 : 0)
+                    .offset(y: isContentVisible ? 0 : 20)
+                    .animation(.easeInOut(duration: 0.5).delay(isRegisterMode ? 0.7 : 0.6), value: isContentVisible)
+                    
+                    Spacer() // Spacer снизу для центрирования
                 }
-                .navigationDestination(isPresented: $navigateToMain) {
-                    MainView()
+                .padding(.bottom, 20)
+                
+                // Кастомное модальное окно для "Забыли пароль?"
+                if showForgotPasswordModal {
+                    ZStack {
+                        // Затемнённый фон
+                        Color.black.opacity(0.4)
+                            .edgesIgnoringSafeArea(.all)
+                            .onTapGesture {
+                                withAnimation {
+                                    showForgotPasswordModal = false
+                                    forgotPasswordEmail = ""
+                                }
+                            }
+                        
+                        // Модальное окно
+                        VStack(spacing: 20) {
+                            Text("Сброс пароля")
+                                .font(.custom("AvenirNext-Bold", size: 20))
+                                .foregroundColor(.primary)
+                            
+                            // Поле для email
+                            ZStack(alignment: .leading) {
+                                TextField("Введите email", text: $forgotPasswordEmail)
+                                    .font(.custom("AvenirNext-Regular", size: 16))
+                                    .padding(12)
+                                    .padding(.leading, 40)
+                                    .background(Color(.systemBackground).opacity(0.9))
+                                    .cornerRadius(10)
+                                    .keyboardType(.emailAddress)
+                                    .autocapitalization(.none)
+                                    .autocorrectionDisabled()
+                                
+                                Image(systemName: "envelope.fill")
+                                    .foregroundColor(.gray)
+                                    .padding(.leading, 15)
+                            }
+                            
+                            // Кнопка "Отправить"
+                            Button(action: {
+                                if !isValidEmail(forgotPasswordEmail) {
+                                    alertMessage = "Некорректный формат email"
+                                    showingAlert = true
+                                } else {
+                                    // Здесь должна быть логика отправки email для сброса пароля
+                                    // Для примера просто показываем сообщение
+                                    alertMessage = "Инструкции по сбросу пароля отправлены на \(forgotPasswordEmail)"
+                                    showingAlert = true
+                                    showForgotPasswordModal = false
+                                    forgotPasswordEmail = ""
+                                }
+                            }) {
+                                Text("Отправить")
+                                    .font(.custom("AvenirNext-Bold", size: 16))
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.black.opacity(0.8))
+                                    .cornerRadius(10)
+                            }
+                            
+                            // Кнопка "Отмена"
+                            Button(action: {
+                                withAnimation {
+                                    showForgotPasswordModal = false
+                                    forgotPasswordEmail = ""
+                                }
+                            }) {
+                                Text("Отмена")
+                                    .font(.custom("AvenirNext-Medium", size: 16))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .padding()
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(red: 0.98, green: 0.96, blue: 0.90), Color(red: 0.94, green: 0.90, blue: 0.80)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(20)
+                        .shadow(radius: 5)
+                        .frame(maxWidth: 300)
+                        .scaleEffect(showForgotPasswordModal ? 1 : 0.8)
+                        .opacity(showForgotPasswordModal ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.3), value: showForgotPasswordModal)
+                    }
                 }
             }
             .alert(isPresented: $showingAlert) {
-                Alert(title: Text(isRegisterMode ? "Успех" : "Ошибка"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+                Alert(title: Text(isRegisterMode ? "Вы с нами?" : "Ошибка"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+            }
+            .navigationDestination(isPresented: $navigateToMain) {
+                MainView()
+            }
+            .onAppear {
+                isContentVisible = true // Запускаем анимацию при появлении
             }
         }
     }
