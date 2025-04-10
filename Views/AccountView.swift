@@ -272,7 +272,8 @@ struct AccountView: View {
                             // Кнопка "Сохранить"
                             Button(action: {
                                 // Проверяем старый пароль
-                                if oldPassword != "123" { // Здесь должна быть ваша логика проверки пароля
+                                let savedPassword = UserDefaults.standard.string(forKey: "password") ?? "123"
+                                if oldPassword != savedPassword {
                                     passwordChangeMessage = "Неверный старый пароль"
                                     showPasswordAlert = true
                                 } else if newPassword != confirmNewPassword {

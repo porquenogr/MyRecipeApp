@@ -3,10 +3,12 @@ import SwiftUI
 // Класс для загрузки рецептов
 class RecipeData: ObservableObject {
     @Published var recipes: [String: [Recipe]] = [:]
+    @Published var popularRecipes: [Recipe] = [] // Новое свойство для хранения популярных рецептов
     let categories = ["Завтрак", "Напитки", "Горячие блюда", "Салаты", "Выпечка"]
     
     init() {
         loadRecipes()
+        generatePopularRecipes() // Генерируем популярные рецепты при инициализации
     }
     
     private func loadRecipes() {
@@ -51,15 +53,37 @@ class RecipeData: ObservableObject {
         }
     }
     
-    // Метод для получения случайных рецептов (по 2 из каждой категории)
-    func getRandomRecipes() -> [Recipe] {
-        var randomRecipes: [Recipe] = []
+    // Метод для генерации фиксированного набора популярных рецептов
+    private func generatePopularRecipes() {
+        var selectedRecipes: [Recipe] = []
+        var usedRecipeIDs: Set<Int> = [] // Для отслеживания уже выбранных рецептов
+        
+        // Первый цикл: по одному рецепту из каждой категории
         for category in categories {
-            if let categoryRecipes = recipes[category]?.shuffled().prefix(2) {
-                randomRecipes.append(contentsOf: categoryRecipes)
+            if let categoryRecipes = recipes[category]?.shuffled() {
+                if let recipe = categoryRecipes.first(where: { !usedRecipeIDs.contains($0.id) }) {
+                    selectedRecipes.append(recipe)
+                    usedRecipeIDs.insert(recipe.id)
+                }
             }
         }
-        return randomRecipes
+        
+        // Второй цикл: ещё по одному рецепту из каждой категории, исключая уже выбранные
+        for category in categories {
+            if let categoryRecipes = recipes[category]?.shuffled() {
+                if let recipe = categoryRecipes.first(where: { !usedRecipeIDs.contains($0.id) }) {
+                    selectedRecipes.append(recipe)
+                    usedRecipeIDs.insert(recipe.id)
+                }
+            }
+        }
+        
+        popularRecipes = selectedRecipes
+    }
+    
+    // Метод для получения фиксированного набора популярных рецептов
+    func getRandomRecipes() -> [Recipe] {
+        return popularRecipes // Возвращаем фиксированный набор
     }
     
     // Метод для получения рецепта дня
@@ -156,9 +180,9 @@ struct MainView: View {
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 15) {
-                                    ForEach(recipeData.getRandomRecipes().indices, id: \.self) { index in
-                                        NavigationLink(destination: RecipeDetailView(recipe: recipeData.getRandomRecipes()[index], recipeData: recipeData)) {
-                                            RecipeCard(recipe: recipeData.getRandomRecipes()[index], recipeData: recipeData)
+                                    ForEach(recipeData.popularRecipes.indices, id: \.self) { index in // Используем popularRecipes
+                                        NavigationLink(destination: RecipeDetailView(recipe: recipeData.popularRecipes[index], recipeData: recipeData)) {
+                                            RecipeCard(recipe: recipeData.popularRecipes[index], recipeData: recipeData)
                                                 .opacity(isRecipesVisible ? 1 : 0)
                                                 .scaleEffect(isRecipesVisible ? 1 : 0.8)
                                                 .animation(.easeInOut(duration: 0.5).delay(Double(index) * 0.1), value: isRecipesVisible)
@@ -432,7 +456,7 @@ struct RandomRecipesListView: View {
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
-                ForEach(recipeData.getRandomRecipes()) { recipe in
+                ForEach(recipeData.popularRecipes) { recipe in // Используем popularRecipes
                     NavigationLink(destination: RecipeDetailView(recipe: recipe, recipeData: recipeData)) {
                         RecipeCard(recipe: recipe, recipeData: recipeData)
                     }
@@ -551,10 +575,19 @@ struct FeaturedSection: View {
     }
 }
 
-// Компонент для секции категорий с кликабельными кнопками
+// Компонент для секции категорий с кликабельными кнопками и иконками
 struct CategorySection: View {
     let categories: [String]
     @ObservedObject var recipeData: RecipeData
+    
+    // Словарь для соответствия категорий и иконок
+    private let categoryIcons: [String: String] = [
+        "Завтрак": "house.fill",
+        "Напитки": "cup.and.saucer.fill",
+        "Горячие блюда": "flame.fill",
+        "Салаты": "leaf.fill",
+        "Выпечка": "birthday.cake.fill"
+    ]
     
     init(categories: [String], recipeData: RecipeData) {
         self.categories = categories
@@ -584,13 +617,20 @@ struct CategorySection: View {
                 HStack(spacing: 10) {
                     ForEach(categories, id: \.self) { category in
                         NavigationLink(destination: CategoryRecipesView(category: category, recipes: recipeData.recipes[category] ?? [], recipeData: recipeData)) {
-                            Text(category)
-                                .font(.custom("AvenirNext-Medium", size: 16))
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.gray.opacity(0.1))
-                                .foregroundColor(.black)
-                                .cornerRadius(20)
+                            HStack(spacing: 8) { // Добавляем иконку и текст в HStack
+                                Image(systemName: categoryIcons[category] ?? "questionmark.circle")
+                                    .resizable()
+                                    .frame(width: 20, height: 20)
+                                    .foregroundColor(.black)
+                                
+                                Text(category)
+                                    .font(.custom("AvenirNext-Medium", size: 16))
+                                    .foregroundColor(.black)
+                            }
+                            .padding(.horizontal, 16) // Увеличиваем горизонтальные отступы для баланса
+                            .padding(.vertical, 10)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(20)
                         }
                     }
                 }
@@ -690,101 +730,105 @@ struct RecipeDetailView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Изображение рецепта с фиксированным размером
-                ZStack {
-                    Image(recipe.imageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 300)
-                        .frame(maxWidth: .infinity)
-                        .cornerRadius(15)
-                        .clipped()
-                        .padding(.horizontal)
-                        .shadow(radius: 5)
-                    
-                    // Кнопка "Избранное" в правом верхнем углу
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    isFavorite.toggle()
-                                    // Обновляем состояние в recipeData
-                                    if var categoryRecipes = recipeData.recipes[recipe.category] {
-                                        if let index = categoryRecipes.firstIndex(where: { $0.id == recipe.id }) {
-                                            categoryRecipes[index].favorites = isFavorite
-                                            recipeData.recipes[recipe.category] = categoryRecipes
-                                            recipeData.saveFavorites()
+        ZStack {
+            // Фоновый градиент
+            LinearGradient(
+                gradient: Gradient(colors: [Color(red: 0.98, green: 0.96, blue: 0.90), Color(red: 0.94, green: 0.90, blue: 0.80)]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Изображение рецепта с фиксированным размером
+                    ZStack {
+                        Image(recipe.imageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 300)
+                            .frame(maxWidth: .infinity)
+                            .cornerRadius(15)
+                            .clipped()
+                            .padding(.horizontal)
+                            .shadow(radius: 5)
+                        
+                        // Кнопка "Избранное" в правом верхнем углу
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        isFavorite.toggle()
+                                        // Обновляем состояние в recipeData
+                                        if var categoryRecipes = recipeData.recipes[recipe.category] {
+                                            if let index = categoryRecipes.firstIndex(where: { $0.id == recipe.id }) {
+                                                categoryRecipes[index].favorites = isFavorite
+                                                recipeData.recipes[recipe.category] = categoryRecipes
+                                                recipeData.saveFavorites()
+                                            }
                                         }
                                     }
+                                }) {
+                                    Image(systemName: isFavorite ? "heart.fill" : "heart")
+                                        .resizable()
+                                        .frame(width: 30, height: 30)
+                                        .foregroundColor(isFavorite ? .red : .gray)
+                                        .scaleEffect(isFavorite ? 1.2 : 1.0)
+                                        .padding(10)
+                                        .background(Color.white.opacity(0.9))
+                                        .clipShape(Circle())
+                                        .shadow(radius: 3)
                                 }
-                            }) {
-                                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                                    .resizable()
-                                    .frame(width: 30, height: 30)
-                                    .foregroundColor(isFavorite ? .red : .gray)
-                                    .scaleEffect(isFavorite ? 1.2 : 1.0)
-                                    .padding(10)
-                                    .background(Color.white.opacity(0.9))
-                                    .clipShape(Circle())
-                                    .shadow(radius: 3)
                             }
+                            Spacer()
                         }
-                        Spacer()
+                        .frame(height: 300, alignment: .topTrailing)
+                        .padding(.top, 10)
+                        .padding(.trailing, 20)
                     }
-                    .frame(height: 300, alignment: .topTrailing)
-                    .padding(.top, 10)
-                    .padding(.trailing, 20)
-                }
-                
-                // Название рецепта (без тени)
-                Text(recipe.name)
-                    .font(.custom("AvenirNext-Bold", size: 24))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal)
-                
-                // Ингредиенты (без тени)
-                Text("Ингредиенты:")
-                    .font(.custom("AvenirNext-Bold", size: 18))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal)
-                
-                ForEach(recipe.ingredients, id: \.self) { ingredient in
-                    Text("• \(ingredient)")
-                        .font(.custom("AvenirNext-Regular", size: 16))
+                    
+                    // Название рецепта (без тени)
+                    Text(recipe.name)
+                        .font(.custom("AvenirNext-Bold", size: 24))
                         .foregroundColor(.primary)
                         .padding(.horizontal)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                
-                // Шаги приготовления (без тени)
-                Text("Шаги:")
-                    .font(.custom("AvenirNext-Bold", size: 18))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal)
-                
-                ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
-                    Text("\(index + 1). \(step)")
-                        .font(.custom("AvenirNext-Regular", size: 16))
+                    
+                    // Ингредиенты (без тени)
+                    Text("Ингредиенты:")
+                        .font(.custom("AvenirNext-Bold", size: 18))
                         .foregroundColor(.primary)
                         .padding(.horizontal)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    ForEach(recipe.ingredients, id: \.self) { ingredient in
+                        Text("• \(ingredient)")
+                            .font(.custom("AvenirNext-Regular", size: 16))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
+                    // Шаги приготовления (без тени)
+                    Text("Шаги:")
+                        .font(.custom("AvenirNext-Bold", size: 18))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal)
+                    
+                    ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
+                        Text("\(index + 1). \(step)")
+                            .font(.custom("AvenirNext-Regular", size: 16))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+                .padding(.vertical)
             }
-            .padding(.vertical)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color(red: 0.98, green: 0.96, blue: 0.90), Color(red: 0.94, green: 0.90, blue: 0.80)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .ignoresSafeArea(edges: .bottom) // Добавили игнорирование нижней безопасной области
         }
         .navigationTitle(recipe.name)
         .navigationBarTitleDisplayMode(.inline)
