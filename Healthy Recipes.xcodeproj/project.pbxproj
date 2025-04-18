@@ -6,13 +6,8 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		12CD0F722DA4D1E100DE15DC /* .gitignore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CD0F702DA4D1D600DE15DC /* .gitignore.swift */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
-		12CD0F252DA2FAD100DE15DC /* Healthy Recipes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "Healthy Recipes.app"; path = "/Users/guzalrustemova/Desktop/Healthy Recipes/build/Debug-iphoneos/Healthy Recipes.app"; sourceTree = "<absolute>"; };
-		12CD0F702DA4D1D600DE15DC /* .gitignore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = .gitignore.swift; sourceTree = "<group>"; };
+		127A339E2DB28D8600142DEB /* Healthy Recipes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Healthy Recipes.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -42,9 +37,9 @@
 		12CD0F1C2DA2FAD100DE15DC = {
 			isa = PBXGroup;
 			children = (
-				12CD0F702DA4D1D600DE15DC /* .gitignore.swift */,
 				12CD0F272DA2FAD100DE15DC /* Healthy Recipes */,
 				12CD0F392DA2FB4700DE15DC /* Views */,
+				127A339E2DB28D8600142DEB /* Healthy Recipes.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -71,7 +66,7 @@
 			packageProductDependencies = (
 			);
 			productName = "Healthy Recipes";
-			productReference = 12CD0F252DA2FAD100DE15DC /* Healthy Recipes.app */;
+			productReference = 127A339E2DB28D8600142DEB /* Healthy Recipes.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -123,7 +118,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				12CD0F722DA4D1E100DE15DC /* .gitignore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

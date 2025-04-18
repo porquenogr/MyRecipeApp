@@ -176,6 +176,7 @@ struct AccountView: View {
                                         // Очищаем данные пользователя
                                         UserDefaults.standard.removeObject(forKey: "username")
                                         UserDefaults.standard.removeObject(forKey: "favorites")
+                                        UserDefaults.standard.removeObject(forKey: "password") // Очищаем пароль
                                         selectedTab = 0
                                         presentationMode.wrappedValue.dismiss()
                                     },
@@ -283,8 +284,8 @@ struct AccountView: View {
                                     passwordChangeMessage = "Новый пароль не может быть пустым"
                                     showPasswordAlert = true
                                 } else {
-                                    // Сохраняем новый пароль (в данном случае просто в UserDefaults)
-                                    // В реальном приложении здесь должна быть серверная логика
+                                    // Сохраняем новый пароль в UserDefaults
+                                    UserDefaults.standard.set(newPassword, forKey: "password")
                                     passwordChangeMessage = "Пароль успешно изменён!"
                                     showPasswordAlert = true
                                     oldPassword = ""
@@ -396,8 +397,9 @@ struct AccountView: View {
                             
                             // Кнопка "Войти"
                             Button(action: {
-                                // Проверяем данные (аналогично WelcomeView)
-                                if newUsername == "user" && newUserPassword == "123" {
+                                // Проверяем данные
+                                let savedPassword = UserDefaults.standard.string(forKey: "password") ?? "123"
+                                if newUserPassword == savedPassword {
                                     // Обновляем данные пользователя
                                     UserDefaults.standard.set(newUsername, forKey: "username")
                                     userChangeMessage = "Пользователь успешно изменён!"
@@ -406,7 +408,7 @@ struct AccountView: View {
                                     newUsername = ""
                                     newUserPassword = ""
                                 } else {
-                                    userChangeMessage = "Неверный логин или пароль"
+                                    userChangeMessage = "Неверный пароль"
                                     showUserAlert = true
                                 }
                             }) {
